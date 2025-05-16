@@ -1,6 +1,5 @@
-
 import { Link } from "react-router-dom";
-import { Scales, MessageSquare, Book, User } from "lucide-react";
+import { Scale, MessageSquare, Book, User } from "lucide-react";
 import Layout from "../components/layout/Layout";
 
 const Index = () => {
@@ -129,7 +128,7 @@ const Index = () => {
             {/* Feature 3 */}
             <div className="card animate-scale-in" style={{ animationDelay: "0.2s" }}>
               <div className="w-14 h-14 bg-judicial-blue/10 rounded-lg flex items-center justify-center mb-4">
-                <Scales size={28} className="text-judicial-blue" />
+                <Scale size={28} className="text-judicial-blue" />
               </div>
               <h3 className="text-xl font-serif text-judicial-blue mb-3">Legal Aid Connection</h3>
               <p className="text-judicial-gray mb-4">

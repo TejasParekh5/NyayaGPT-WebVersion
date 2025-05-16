@@ -1,6 +1,5 @@
-
 import Layout from "../components/layout/Layout";
-import { Scales, FileTextIcon, GavelIcon, Book } from "lucide-react";
+import { Scale, FileTextIcon, GavelIcon, Book } from "lucide-react";
 
 const About = () => {
   return (
