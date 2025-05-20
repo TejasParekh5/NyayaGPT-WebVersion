@@ -1,18 +1,8 @@
-# Welcome to your Lovable project
-
-## Project info
-
-**URL**: https://lovable.dev/projects/db32d67d-5ff5-4aee-8eeb-de82c0821c87
+# Welcome
 
 ## How can I edit this code?
 
 There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/db32d67d-5ff5-4aee-8eeb-de82c0821c87) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
 
 **Use your preferred IDE**
 
@@ -34,6 +24,18 @@ npm i
 
 # Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
+
+# step 5: Follow the steps to commit the changes from vs code to github repo. follow this steps after cloning repo
+git init
+
+# step 6: Replace "your name" and "your-email@example.com" with the name and email you use for your GitHub account.
+git config --global user.name "your name"
+git config --global user.email "your-email@example.com"
+
+# step 7: Make Your Changes in VS Code then do this.
+git add .
+git commit -m "Your commit message"
+git push origin main
 ```
 
 **Edit a file directly in GitHub**
@@ -41,14 +43,6 @@ npm run dev
 - Navigate to the desired file(s).
 - Click the "Edit" button (pencil icon) at the top right of the file view.
 - Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
 
 ## What technologies are used for this project?
 
@@ -59,15 +53,3 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/db32d67d-5ff5-4aee-8eeb-de82c0821c87) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
