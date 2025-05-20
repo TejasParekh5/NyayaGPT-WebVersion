@@ -6,11 +6,11 @@ const Index = () => {
   return (
     <Layout>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-judicial-blue to-blue-900 text-white py-20 md:py-28">
+      <section className="bg-gradient-to-br from-judicial-blue to-blue-900 text-white py-20 md:py-[11.5rem]">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
             <div className="space-y-6 animate-fade-in">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white leading-tight">
+              <h1 className="text-6xl md:text-6xl lg:text-8xl font-serif text-white leading-loose">
                 Justice in Your Language, <span className="text-judicial-orange">Instantly.</span>
               </h1>
               <p className="text-xl text-gray-200">
@@ -25,36 +25,41 @@ const Index = () => {
             </div>
             <div className="hidden md:block">
               <div className="relative">
-                <div className="w-full h-[400px] bg-white/10 backdrop-blur-sm rounded-lg shadow-xl overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-12 bg-judicial-blue/30 backdrop-blur-sm flex items-center px-4">
+                 <div className="w-full h-[400px] bg-white/20 border border-white/20 backdrop-blur-lg rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/10">
+                  {/* Gradient accent bar */}
+                  {/* <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-b from-judicial-blue/80 to-judicial-grey/80 z-10"></div> */}
+                  {/* Window controls */}
+                  <div className="absolute top-0 left-0 w-full h-12 bg-white/30 backdrop-blur-md flex items-center px-6 border-b border-white/20 z-20">
                     <div className="flex space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                      <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
+                      <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
                       <div className="w-3 h-3 rounded-full bg-green-500"></div>
                     </div>
+                    <span className="ml-4 text-xs text-gray-700/70 font-semibold tracking-wide">NyaySetu Chat</span>
                   </div>
-                  <div className="p-6 pt-16">
+                  {/* Chat content */}
+                  <div className="p-6 pt-20">
                     <div className="flex items-start space-x-4 mb-6">
-                      <div className="w-10 h-10 rounded-full bg-judicial-orange flex items-center justify-center text-white">
+                      <div className="w-10 h-10 rounded-full bg-judicial-orange flex items-center justify-center text-white shadow-lg ring-2 ring-white/40">
                         <User size={20} />
                       </div>
-                      <div className="bg-gray-100 rounded-lg p-3 max-w-[80%]">
+                      <div className="bg-gray-100 rounded-lg p-3 max-w-[80%] shadow">
                         <p className="text-judicial-gray">मुझे FIR दर्ज करने के बारे में जानकारी चाहिए</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-4 mb-6">
-                      <div className="w-10 h-10 rounded-full bg-judicial-blue flex items-center justify-center text-white">
+                      <div className="w-10 h-10 rounded-full bg-judicial-blue flex items-center justify-center text-white shadow-lg ring-2 ring-white/40">
                         <MessageSquare size={20} />
                       </div>
-                      <div className="bg-white rounded-lg p-3 max-w-[80%] shadow-sm">
+                      <div className="bg-white rounded-lg p-3 max-w-[80%] shadow">
                         <p className="text-judicial-gray">FIR (प्रथम सूचना रिपोर्ट) एक लिखित दस्तावेज है जो पुलिस द्वारा किसी अपराध की सूचना मिलने पर तैयार किया जाता है। आप निम्न तरीकों से FIR दर्ज करा सकते हैं...</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-4">
-                      <div className="w-10 h-10 rounded-full bg-judicial-orange flex items-center justify-center text-white">
+                      <div className="w-10 h-10 rounded-full bg-judicial-orange flex items-center justify-center text-white shadow-lg ring-2 ring-white/40">
                         <User size={20} />
                       </div>
-                      <div className="bg-gray-100 rounded-lg p-3 max-w-[80%]">
+                      <div className="bg-gray-100 rounded-lg p-3 max-w-[80%] shadow">
                         <p className="text-judicial-gray">What documents do I need to file an FIR?</p>
                       </div>
                     </div>

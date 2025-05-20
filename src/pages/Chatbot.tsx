@@ -139,7 +139,7 @@ const Chatbot = () => {
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-judicial-blue to-blue-900 text-white py-12">
         <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl font-serif mb-4">Legal Assistance Chatbot</h1>
+          <h1 className="text-4xl font-serif mb-4 text-white">Legal Assistance Chatbot</h1>
           <p className="text-xl max-w-2xl mx-auto">
             Get instant legal guidance in your language through our AI-powered assistant.
           </p>

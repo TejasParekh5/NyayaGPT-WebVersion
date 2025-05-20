@@ -78,7 +78,7 @@ const Profile = () => {
             {/* Profile Info */}
             <div className="text-center md:text-left flex-1">
               <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                <h1 className="text-2xl md:text-3xl font-serif">{userData.name}</h1>
+                <h1 className="text-2xl md:text-3xl font-serif text-white">{userData.name}</h1>
                 <div className="flex justify-center md:justify-start gap-2">
                   <span className="bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full text-xs">
                     {userData.preferredLanguage}
