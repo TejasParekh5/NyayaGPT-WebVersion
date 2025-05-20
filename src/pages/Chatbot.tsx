@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import Layout from "../components/layout/Layout";
 import { Send, Mic, MicOff, Volume2, VolumeX, MessageSquare, Loader2 } from "lucide-react";
@@ -36,6 +35,7 @@ const Chatbot = () => {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null); // NEW: ref for chat container
 
   const languages = [
     { code: "en", name: "English" },
@@ -51,7 +51,10 @@ const Chatbot = () => {
   ];
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Scroll only the chat container, not the whole page
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   };
 
   useEffect(() => {
@@ -89,10 +92,9 @@ const Chatbot = () => {
     }, 1500);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleSendMessage();
-    }
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); // Prevents page scroll/jump
+    handleSendMessage();
   };
 
   const toggleRecording = () => {
@@ -229,7 +231,10 @@ const Chatbot = () => {
                 </div>
 
                 {/* Messages Container */}
-                <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                <div
+                  className="flex-1 overflow-y-auto p-4 bg-gray-50"
+                  ref={chatContainerRef} // Attach ref here
+                >
                   {messages.map((message) => (
                     <div
                       key={message.id}
@@ -274,35 +279,37 @@ const Chatbot = () => {
 
                 {/* Input Area */}
                 <div className="p-4 border-t border-gray-200 bg-white">
-                  <div className="flex items-center">
-                    <button 
-                      onClick={toggleRecording}
-                      className={`p-2 rounded-full mr-2 ${
-                        isRecording ? "text-red-500" : "text-gray-400 hover:text-judicial-blue"
-                      }`}
-                    >
-                      {isRecording ? <Loader2 className="animate-spin" size={20} /> : <Mic size={20} />}
-                    </button>
-                    <input
-                      type="text"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder={`Type your legal query in ${languages.find(l => l.code === selectedLanguage)?.name}...`}
-                      className="flex-1 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-judicial-blue"
-                    />
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={input.trim() === ""}
-                      className={`p-2 rounded-full ml-2 ${
-                        input.trim() === ""
-                          ? "text-gray-300"
-                          : "text-judicial-blue hover:bg-judicial-blue/10"
-                      }`}
-                    >
-                      <Send size={20} />
-                    </button>
-                  </div>
+                  <form onSubmit={handleFormSubmit}>
+                    <div className="flex items-center">
+                      <button 
+                        onClick={toggleRecording}
+                        type="button"
+                        className={`p-2 rounded-full mr-2 ${
+                          isRecording ? "text-red-500" : "text-gray-400 hover:text-judicial-blue"
+                        }`}
+                      >
+                        {isRecording ? <Loader2 className="animate-spin" size={20} /> : <Mic size={20} />}
+                      </button>
+                      <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder={`Type your legal query in ${languages.find(l => l.code === selectedLanguage)?.name}...`}
+                        className="flex-1 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-judicial-blue"
+                      />
+                      <button
+                        type="submit"
+                        disabled={input.trim() === ""}
+                        className={`p-2 rounded-full ml-2 ${
+                          input.trim() === ""
+                            ? "text-gray-300"
+                            : "text-judicial-blue hover:bg-judicial-blue/10"
+                        }`}
+                      >
+                        <Send size={20} />
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
 

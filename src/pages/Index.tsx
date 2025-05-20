@@ -6,7 +6,7 @@ const Index = () => {
   return (
     <Layout>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-judicial-blue to-blue-900 text-white py-20 md:py-[11.5rem]">
+      <section className="bg-gradient-to-br from-judicial-blue to-blue-900 text-white py-20 md:py-[10rem]">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
             <div className="space-y-6 animate-fade-in">
