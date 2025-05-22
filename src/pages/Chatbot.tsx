@@ -33,9 +33,16 @@ const Chatbot = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("en");
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [recognitionError, setRecognitionError] = useState<string | null>(null);
+  
+  // Audio elements
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null); // NEW: ref for chat container
+  const chatContainerRef = useRef<HTMLDivElement>(null); 
 
   const languages = [
     { code: "en", name: "English" },
@@ -51,7 +58,6 @@ const Chatbot = () => {
   ];
 
   const scrollToBottom = () => {
-    // Scroll only the chat container, not the whole page
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
@@ -61,7 +67,22 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = () => {
+  // Initialize audio context and speech recognition
+  useEffect(() => {
+    // Create audio element for TTS playback
+    const audio = new Audio();
+    audioRef.current = audio;
+    
+    // Clean up on component unmount
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      stopRecording();
+    };
+  }, []);
+
+  const handleSendMessage = async () => {
     if (input.trim() === "") return;
 
     const userMessage: Message = {
@@ -73,67 +94,256 @@ const Chatbot = () => {
 
     setMessages([...messages, userMessage]);
     setInput("");
-    
-    // Simulate bot thinking
     setIsTyping(true);
-    
-    // Simulate bot response (in a real app, this would be an API call)
-    setTimeout(() => {
-      const botReply = generateSimpleResponse(input);
+
+    // Call backend API for bot response
+    try {
+      const response = await fetch("http://localhost:5000/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: input, language: selectedLanguage }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
       const botMessage: Message = {
         id: messages.length + 2,
-        text: botReply,
+        text: data.reply,
         sender: "bot",
         timestamp: new Date(),
       };
       
       setMessages((prevMessages) => [...prevMessages, botMessage]);
-      setIsTyping(false);
-    }, 1500);
+      
+      // If text-to-speech is active, speak the response
+      if (isSpeaking) {
+        speakText(data.reply);
+      }
+    } catch (err) {
+      console.error("Error sending message:", err);
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          id: messages.length + 2,
+          text: "Sorry, there was an error connecting to the server.",
+          sender: "bot",
+          timestamp: new Date(),
+        },
+      ]);
+    }
+    
+    setIsTyping(false);
   };
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault(); // Prevents page scroll/jump
+    e.preventDefault();
     handleSendMessage();
   };
+  // Function to start recording audio
+  const startRecording = async () => {
+    setRecognitionError(null);
+    try {
+      // First try to get microphone permissions
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
 
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-    // In a real app, this would start/stop speech recognition
-    if (!isRecording) {
-      // Simulate voice input
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        processAudio(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+
+      // Set a timeout to automatically stop recording after 5 seconds
+      // This is for demonstration purposes only and should be changed in production
       setTimeout(() => {
-        setInput("How do I file a consumer complaint?");
+        if (isRecording && mediaRecorderRef.current) {
+          stopRecording();
+        }
+      }, 5000);
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      setRecognitionError("Could not access microphone. Please check permissions.");
+      
+      // If we can't access the microphone, we'll simulate recording
+      setIsRecording(true);
+      setTimeout(() => {
+        // Simulate processing with backend
         setIsRecording(false);
-      }, 2000);
+        simulateSpeechRecognition();
+      }, 3000);
     }
   };
 
+  // Function to stop recording audio
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      
+      // Also stop all audio tracks
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+    }
+  };
+  // Simulate speech recognition when we can't access the microphone
+  const simulateSpeechRecognition = async () => {
+    try {
+      setIsTyping(true);
+      
+      // Call our backend to get simulated text
+      const response = await fetch('http://localhost:5000/speech-to-text', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          simulatedRequest: true,
+          language: selectedLanguage,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.text) {
+        setInput(data.text);
+        setTimeout(() => {
+          handleSendMessage();
+        }, 500);
+      } else {
+        setRecognitionError("Could not recognize speech. Please try again.");
+      }
+      
+      setIsTyping(false);
+    } catch (error) {
+      console.error("Error in simulated speech recognition:", error);
+      setRecognitionError("Error processing speech. Please try again.");
+      setIsTyping(false);
+    }
+  };
+
+  // Process recorded audio for speech-to-text conversion
+  const processAudio = async (audioBlob: Blob) => {
+    try {
+      setIsTyping(true); // Show typing indicator while processing
+      
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Audio = reader.result?.toString().split(',')[1];
+        
+        if (base64Audio) {
+          // Send to our API for speech recognition
+          const response = await fetch('http://localhost:5000/speech-to-text', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              audio: base64Audio,
+              language: selectedLanguage,
+            }),
+          });
+          
+          const data = await response.json();
+          
+          if (data.text) {
+            setInput(data.text);
+            setTimeout(() => {
+              handleSendMessage();
+            }, 500);
+          } else {
+            setRecognitionError("Could not recognize speech. Please try again.");
+          }
+        }
+        setIsTyping(false);
+      };
+      
+      reader.readAsDataURL(audioBlob);
+    } catch (error) {
+      console.error("Error processing audio:", error);
+      setRecognitionError("Error processing audio. Please try again.");
+      setIsTyping(false);
+    }
+  };
+
+  // Toggle recording state
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  // Text-to-Speech functionality
+  const speakText = async (text: string) => {
+    if (!text) return;
+    
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      
+      // Call text-to-speech API
+      const response = await fetch('http://localhost:5000/text-to-speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          language: selectedLanguage,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      // If we have a real audio URL (not from placeholder response)
+      if (data.audioUrl) {
+        setAudioUrl(`http://localhost:5000${data.audioUrl}`);
+        if (audioRef.current) {
+          audioRef.current.src = `http://localhost:5000${data.audioUrl}`;
+          audioRef.current.play();
+        }
+      }
+    } catch (error) {
+      console.error("Error in text-to-speech:", error);
+    }
+  };
+
+  // Toggle speaking state and speak the last bot message if enabled
   const toggleSpeaking = () => {
-    setIsSpeaking(!isSpeaking);
-    // In a real app, this would start/stop text-to-speech
+    const newSpeakingState = !isSpeaking;
+    setIsSpeaking(newSpeakingState);
+    
+    if (newSpeakingState) {
+      // Find the last bot message and speak it
+      const lastBotMessage = [...messages].reverse().find(msg => msg.sender === 'bot');
+      if (lastBotMessage) {
+        speakText(lastBotMessage.text);
+      }
+    } else if (audioRef.current) {
+      // Stop speaking
+      audioRef.current.pause();
+    }
   };
 
   const handleSampleQuery = (query: string) => {
     setInput(query);
-  };
-
-  // Very simple response generator for demo purposes
-  const generateSimpleResponse = (input: string) => {
-    const lowerInput = input.toLowerCase();
-    if (lowerInput.includes("fir") || lowerInput.includes("complaint")) {
-      return "To file an FIR (First Information Report), you need to visit the nearest police station where the incident occurred. Provide all details of the incident, including date, time, location, and description. The police officer is legally obligated to register your complaint. You'll receive a copy of the FIR for your records. If the police refuse to file your FIR, you can approach the Superintendent of Police or file a complaint to the magistrate under Section 156(3) of CrPC.";
-    } else if (lowerInput.includes("arrest") || lowerInput.includes("rights")) {
-      return "If you are arrested, you have the following rights: 1) Right to know the grounds of arrest, 2) Right to inform a relative/friend, 3) Right to meet a lawyer of your choice, 4) Right to be produced before a magistrate within 24 hours, 5) Right to medical examination, 6) Right to not be detained for more than 24 hours without judicial authorization, 7) Right to apply for bail. These rights are guaranteed under Article 22 of the Constitution and Sections 50-54 of CrPC.";
-    } else if (lowerInput.includes("legal aid")) {
-      return "To apply for legal aid in India, approach your nearest District Legal Services Authority (DLSA) or State Legal Services Authority (SLSA). Fill out the application form and provide proof of eligibility (income certificate, caste certificate if applicable, or proof of belonging to special categories). Legal aid is free for women, children, SC/ST communities, victims of mass disasters, industrial workmen, and persons with disabilities. Others can qualify if their annual income is below the threshold set by the respective State Legal Services Authority.";
-    } else if (lowerInput.includes("property") || lowerInput.includes("registration")) {
-      return "For property registration in India, you need: 1) Sale deed or transfer document, 2) Property title documents, 3) Approval plans from local authorities, 4) Tax receipts showing payment of property tax, 5) NOC from housing society (if applicable), 6) Identity proof of all parties, 7) Photographs of all parties. The registration process involves payment of stamp duty and registration fees, which vary by state. The document must be registered within 4 months of execution at the Sub-Registrar's office having jurisdiction over the property's location.";
-    } else if (lowerInput.includes("consumer")) {
-      return "To file a consumer complaint: 1) Write a formal complaint to the service provider/seller first. 2) If unsatisfied with the response, file a complaint with the appropriate Consumer Dispute Redressal Commission based on the value of goods/services: District Commission (up to ₹1 crore), State Commission (₹1-10 crore), or National Commission (above ₹10 crore). 3) Submit your complaint with relevant documents, including proof of transaction, within 2 years of the cause of action. Online filing is available at e-daakhil portal (https://edaakhil.nic.in).";
-    } else {
-      return "Thank you for your query. In a fully implemented version, I would provide accurate legal information on this topic. For now, please try asking about filing an FIR, your rights when arrested, applying for legal aid, consumer complaints, or property registration.";
-    }
   };
 
   return (
@@ -202,8 +412,9 @@ const Chatbot = () => {
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                         isRecording ? "bg-red-500 text-white" : "bg-gray-100 text-judicial-gray"
                       }`}
+                      aria-label={isRecording ? "Stop recording" : "Start recording"}
                     >
-                      {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+                      {isRecording ? <Loader2 className="animate-spin" size={18} /> : <Mic size={18} />}
                     </button>
                   </div>
                   <div className="flex items-center justify-between">
@@ -213,10 +424,14 @@ const Chatbot = () => {
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                         isSpeaking ? "bg-judicial-blue text-white" : "bg-gray-100 text-judicial-gray"
                       }`}
+                      aria-label={isSpeaking ? "Turn off text-to-speech" : "Turn on text-to-speech"}
                     >
                       {isSpeaking ? <Volume2 size={18} /> : <VolumeX size={18} />}
                     </button>
                   </div>
+                  {recognitionError && (
+                    <div className="text-red-500 text-sm mt-2">{recognitionError}</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -233,7 +448,7 @@ const Chatbot = () => {
                 {/* Messages Container */}
                 <div
                   className="flex-1 overflow-y-auto p-4 bg-gray-50"
-                  ref={chatContainerRef} // Attach ref here
+                  ref={chatContainerRef}
                 >
                   {messages.map((message) => (
                     <div
@@ -259,6 +474,17 @@ const Chatbot = () => {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}
+                          
+                          {/* Add speak button for bot messages */}
+                          {message.sender === "bot" && (
+                            <button 
+                              onClick={() => speakText(message.text)}
+                              className="ml-2 text-judicial-blue hover:text-judicial-orange"
+                              aria-label="Speak this message"
+                            >
+                              <Volume2 size={12} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -321,6 +547,9 @@ const Chatbot = () => {
           </div>
         </div>
       </section>
+      
+      {/* Hidden audio element for playing TTS */}
+      <audio ref={audioRef} className="hidden" />
     </Layout>
   );
 };
