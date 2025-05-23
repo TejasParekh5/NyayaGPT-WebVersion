@@ -56,24 +56,43 @@ const getBhashiniConfig = async () => {
 };
 
 // Convert speech to text using Bhashini API
-const bhashiniSpeechToText = async (audioData, language) => {
+const bhashiniSpeechToText = async (audioData, language, autoDetect = false) => {
   try {
     // Get language code in the format Bhashini expects
     const languageCode = getBhashiniLanguageCode(language);
     
-    // Call Bhashini ASR (Automatic Speech Recognition) API
-    const response = await axios.post(`${BHASHINI_API_URL}/asr`, {
+    // Prepare request body based on whether we want auto-detection
+    const requestBody = {
       audio: audioData,
-      language: languageCode,
-      apiKey: BHASHINI_INFERENCE_API_KEY
-    }, {
+      apiKey: BHASHINI_INFERENCE_API_KEY,
+    };
+    
+    // If not auto-detecting, specify the language
+    if (!autoDetect) {
+      requestBody.language = languageCode;
+    } else {
+      // Set auto-detection flag (adjust as needed for actual Bhashini API)
+      requestBody.autoDetectLanguage = true;
+    }
+    
+    // Call Bhashini ASR (Automatic Speech Recognition) API
+    const response = await axios.post(`${BHASHINI_API_URL}/asr`, requestBody, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': BHASHINI_UDYAT_KEY
       }
     });
     
-    return response.data.text || '';
+    // Return both the recognized text and detected language (if available)
+    const result = {
+      text: response.data.text || ''
+    };
+    
+    if (response.data.detectedLanguage) {
+      result.detectedLanguage = response.data.detectedLanguage;
+    }
+    
+    return result;
   } catch (error) {
     console.error('Error in Bhashini speech-to-text:', error);
     throw error;
@@ -81,17 +100,20 @@ const bhashiniSpeechToText = async (audioData, language) => {
 };
 
 // Convert text to speech using Bhashini API
-const bhashiniTextToSpeech = async (text, language) => {
+const bhashiniTextToSpeech = async (text, language, gender = 'female', rate = 1.0, pitch = 1.0) => {
   try {
     // Get language code in the format Bhashini expects
     const languageCode = getBhashiniLanguageCode(language);
     
-    // Call Bhashini TTS (Text-to-Speech) API
+    // Call Bhashini TTS (Text-to-Speech) API with enhanced parameters
     const response = await axios.post(`${BHASHINI_API_URL}/tts`, {
       input: text,
       language: languageCode,
       apiKey: BHASHINI_INFERENCE_API_KEY,
-      gender: 'female' // Or 'male', depending on your preference
+      gender: gender,
+      // Bhashini-specific parameters (may need adjustment based on actual API)
+      speed: rate,
+      pitch: pitch
     }, {
       headers: {
         'Content-Type': 'application/json',
@@ -163,7 +185,9 @@ app.post('/speech-to-text', async (req, res) => {
       
       // Generate simulated response based on language
       let simulatedText = "How do I file an FIR?"; // Default English
+      let detectedLanguage = null;
       const lang = req.body.language || 'en';
+      const autoDetect = req.body.autoDetectLanguage || false;
       
       if (lang === 'hi') {
         simulatedText = "मुझे FIR दर्ज करने के बारे में जानकारी चाहिए";
@@ -171,9 +195,22 @@ app.post('/speech-to-text', async (req, res) => {
         simulatedText = "FIR பதிவு செய்வது எப்படி?";
       }
       
+      // Simulate language detection for demonstration
+      if (autoDetect) {
+        // In a real implementation, this would be determined by the API
+        // Here we're just simulating a detected language
+        detectedLanguage = Math.random() > 0.5 ? 'hi' : 'en';
+        if (detectedLanguage === 'hi') {
+          simulatedText = "मुझे FIR दर्ज करने के बारे में जानकारी चाहिए";
+        }
+      }
+      
       // Simulate processing delay
       setTimeout(() => {
-        res.json({ text: simulatedText });
+        res.json({ 
+          text: simulatedText,
+          detectedLanguage: autoDetect ? detectedLanguage : null
+        });
       }, 1000);
       return;
     }
@@ -201,23 +238,37 @@ app.post('/speech-to-text', async (req, res) => {
         .map(result => result.alternatives[0].transcript)
         .join('\n');
       
-      res.json({ text: transcription });
-    } else if (BHASHINI_UDYAT_KEY && BHASHINI_INFERENCE_API_KEY) {
+      res.json({ text: transcription });    } else if (BHASHINI_UDYAT_KEY && BHASHINI_INFERENCE_API_KEY) {
       // Using Bhashini API
       console.log("Using Bhashini API for speech recognition");
       const audio = req.body.audio; // Base64 encoded audio
       const language = req.body.language || 'en';
+      const autoDetect = req.body.autoDetectLanguage || false;
       
       try {
-        const transcription = await bhashiniSpeechToText(audio, language);
-        res.json({ text: transcription });
+        const result = await bhashiniSpeechToText(audio, language, autoDetect);
+        
+        // Return both the text and detected language (if available)
+        const response = { text: result.text };
+        if (result.detectedLanguage) {
+          response.detectedLanguage = result.detectedLanguage;
+        }
+        
+        res.json(response);
       } catch (bhashiniError) {
         console.error('Bhashini API error:', bhashiniError);
         // Fallback to simulation if Bhashini API fails
         const simulatedText = language === 'hi' 
           ? "मुझे FIR दर्ज करने के बारे में जानकारी चाहिए" 
           : "How do I file an FIR?";
-        res.json({ text: simulatedText });
+        
+        // If auto-detection was requested, also return a simulated detected language
+        const response = { text: simulatedText };
+        if (autoDetect) {
+          response.detectedLanguage = Math.random() > 0.5 ? 'hi' : 'en';
+        }
+        
+        res.json(response);
       }
     } else {
       // No API credentials available - simulate
@@ -244,7 +295,7 @@ app.post('/speech-to-text', async (req, res) => {
 // Text-to-Speech endpoint
 app.post('/text-to-speech', async (req, res) => {
   try {
-    const { text, language } = req.body;
+    const { text, language, voiceGender = 'female', speechRate = 1.0, speechPitch = 1.0, speechVolume = 1.0 } = req.body;
     const languageCode = language || 'en';
     
     // Check which API to use
@@ -254,8 +305,16 @@ app.post('/text-to-speech', async (req, res) => {
       
       const request = {
         input: { text },
-        voice: { languageCode: `${languageCode}-IN`, ssmlGender: 'NEUTRAL' },
-        audioConfig: { audioEncoding: 'MP3' },
+        voice: { 
+          languageCode: `${languageCode}-IN`, 
+          ssmlGender: voiceGender === 'male' ? 'MALE' : 'FEMALE'
+        },
+        audioConfig: { 
+          audioEncoding: 'MP3',
+          speakingRate: parseFloat(speechRate),
+          pitch: parseFloat(speechPitch),
+          volumeGainDb: parseFloat(speechVolume) * 10 - 10 // Convert 0-1 range to dB (-10 to 0)
+        },
       };
       
       const [response] = await ttsClient.synthesizeSpeech(request);
@@ -275,8 +334,14 @@ app.post('/text-to-speech', async (req, res) => {
       console.log("Using Bhashini API for text-to-speech");
       
       try {
-        // Get audio content from Bhashini API
-        const audioContent = await bhashiniTextToSpeech(text, languageCode);
+        // Get audio content from Bhashini API with enhanced parameters
+        const audioContent = await bhashiniTextToSpeech(
+          text, 
+          languageCode, 
+          voiceGender, 
+          speechRate,
+          speechPitch
+        );
         
         // Generate unique filename
         const filename = `bhashini-speech-${Date.now()}.mp3`;

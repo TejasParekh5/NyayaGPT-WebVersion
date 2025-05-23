@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import Layout from "../components/layout/Layout";
-import { Send, Mic, MicOff, Volume2, VolumeX, MessageSquare, Loader2 } from "lucide-react";
+import { Send, Mic, MicOff, Volume2, VolumeX, MessageSquare, Loader2, Settings, User2 } from "lucide-react";
 
 interface Message {
   id: number;
@@ -35,6 +35,15 @@ const Chatbot = () => {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [recognitionError, setRecognitionError] = useState<string | null>(null);
+  
+  // New state variables for enhanced TTS and STT options
+  const [showAccessibilitySettings, setShowAccessibilitySettings] = useState(false);
+  const [voiceGender, setVoiceGender] = useState<"female" | "male">("female");
+  const [speechRate, setSpeechRate] = useState(1.0);
+  const [speechPitch, setSpeechPitch] = useState(1.0);
+  const [speechVolume, setSpeechVolume] = useState(1.0);
+  const [recordingDuration, setRecordingDuration] = useState(5); // in seconds
+  const [autoDetectLanguage, setAutoDetectLanguage] = useState(false);
   
   // Audio elements
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -161,18 +170,15 @@ const Chatbot = () => {
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
         processAudio(audioBlob);
-      };
-
-      mediaRecorder.start();
+      };      mediaRecorder.start();
       setIsRecording(true);
 
-      // Set a timeout to automatically stop recording after 5 seconds
-      // This is for demonstration purposes only and should be changed in production
+      // Set a timeout to automatically stop recording based on user's settings
       setTimeout(() => {
         if (isRecording && mediaRecorderRef.current) {
           stopRecording();
         }
-      }, 5000);
+      }, recordingDuration * 1000); // Convert seconds to milliseconds
     } catch (error) {
       console.error("Error accessing microphone:", error);
       setRecognitionError("Could not access microphone. Please check permissions.");
@@ -234,7 +240,6 @@ const Chatbot = () => {
       setIsTyping(false);
     }
   };
-
   // Process recorded audio for speech-to-text conversion
   const processAudio = async (audioBlob: Blob) => {
     try {
@@ -246,7 +251,7 @@ const Chatbot = () => {
         const base64Audio = reader.result?.toString().split(',')[1];
         
         if (base64Audio) {
-          // Send to our API for speech recognition
+          // Send to our API for speech recognition with enhanced options
           const response = await fetch('http://localhost:5000/speech-to-text', {
             method: 'POST',
             headers: {
@@ -255,6 +260,7 @@ const Chatbot = () => {
             body: JSON.stringify({
               audio: base64Audio,
               language: selectedLanguage,
+              autoDetectLanguage,
             }),
           });
           
@@ -262,6 +268,12 @@ const Chatbot = () => {
           
           if (data.text) {
             setInput(data.text);
+            
+            // If language was auto-detected, update the language selector
+            if (data.detectedLanguage && autoDetectLanguage) {
+              setSelectedLanguage(data.detectedLanguage);
+            }
+            
             setTimeout(() => {
               handleSendMessage();
             }, 500);
@@ -288,7 +300,6 @@ const Chatbot = () => {
       startRecording();
     }
   };
-
   // Text-to-Speech functionality
   const speakText = async (text: string) => {
     if (!text) return;
@@ -298,7 +309,7 @@ const Chatbot = () => {
         audioRef.current.pause();
       }
       
-      // Call text-to-speech API
+      // Call text-to-speech API with enhanced options
       const response = await fetch('http://localhost:5000/text-to-speech', {
         method: 'POST',
         headers: {
@@ -307,6 +318,10 @@ const Chatbot = () => {
         body: JSON.stringify({
           text,
           language: selectedLanguage,
+          voiceGender,
+          speechRate,
+          speechPitch,
+          speechVolume,
         }),
       });
       
@@ -317,6 +332,8 @@ const Chatbot = () => {
         setAudioUrl(`http://localhost:5000${data.audioUrl}`);
         if (audioRef.current) {
           audioRef.current.src = `http://localhost:5000${data.audioUrl}`;
+          audioRef.current.volume = speechVolume;
+          audioRef.current.playbackRate = speechRate;
           audioRef.current.play();
         }
       }
@@ -399,12 +416,21 @@ const Chatbot = () => {
                     </li>
                   ))}
                 </ul>
-              </div>
-
-              {/* Accessibility Options */}
+              </div>              {/* Accessibility Options */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
-                <h3 className="text-xl font-serif text-judicial-blue mb-4">Accessibility</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-serif text-judicial-blue">Accessibility</h3>
+                  <button 
+                    onClick={() => setShowAccessibilitySettings(!showAccessibilitySettings)}
+                    className="text-judicial-blue hover:text-judicial-orange"
+                    aria-label="Toggle accessibility settings"
+                  >
+                    <Settings size={18} />
+                  </button>
+                </div>
+                
                 <div className="space-y-4">
+                  {/* Basic Controls */}
                   <div className="flex items-center justify-between">
                     <span className="text-judicial-gray">Voice Input</span>
                     <button
@@ -417,6 +443,7 @@ const Chatbot = () => {
                       {isRecording ? <Loader2 className="animate-spin" size={18} /> : <Mic size={18} />}
                     </button>
                   </div>
+                  
                   <div className="flex items-center justify-between">
                     <span className="text-judicial-gray">Text-to-Speech</span>
                     <button
@@ -429,6 +456,135 @@ const Chatbot = () => {
                       {isSpeaking ? <Volume2 size={18} /> : <VolumeX size={18} />}
                     </button>
                   </div>
+                  
+                  {/* Advanced Settings - Conditional Rendering */}
+                  {showAccessibilitySettings && (
+                    <div className="mt-6 border-t pt-4 border-gray-100">
+                      <h4 className="font-medium text-judicial-blue mb-3">Voice Settings</h4>
+                      
+                      {/* Voice Gender Selection */}
+                      <div className="mb-3">
+                        <label className="block text-sm text-judicial-gray mb-1">Voice Type</label>
+                        <div className="flex space-x-2">
+                          <button
+                            className={`px-3 py-2 text-sm rounded-md flex items-center ${
+                              voiceGender === 'female' 
+                                ? 'bg-judicial-blue/10 text-judicial-blue border border-judicial-blue/30' 
+                                : 'bg-gray-50 text-gray-500 border border-gray-200'
+                            }`}
+                            onClick={() => setVoiceGender('female')}
+                          >
+                            <User2 size={14} className="mr-1" /> Female
+                          </button>
+                          <button
+                            className={`px-3 py-2 text-sm rounded-md flex items-center ${
+                              voiceGender === 'male' 
+                                ? 'bg-judicial-blue/10 text-judicial-blue border border-judicial-blue/30' 
+                                : 'bg-gray-50 text-gray-500 border border-gray-200'
+                            }`}
+                            onClick={() => setVoiceGender('male')}
+                          >
+                            <User2 size={14} className="mr-1" /> Male
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Speech Rate */}
+                      <div className="mb-3">
+                        <label className="flex justify-between text-sm text-judicial-gray mb-1">
+                          <span>Speech Rate</span>
+                          <span>{speechRate.toFixed(1)}x</span>
+                        </label>
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="2"
+                          step="0.1"
+                          value={speechRate}
+                          onChange={(e) => setSpeechRate(parseFloat(e.target.value))}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400">
+                          <span>Slow</span>
+                          <span>Normal</span>
+                          <span>Fast</span>
+                        </div>
+                      </div>
+                      
+                      {/* Speech Volume */}
+                      <div className="mb-3">
+                        <label className="flex justify-between text-sm text-judicial-gray mb-1">
+                          <span>Volume</span>
+                          <span>{Math.round(speechVolume * 100)}%</span>
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.1"
+                          value={speechVolume}
+                          onChange={(e) => setSpeechVolume(parseFloat(e.target.value))}
+                          className="w-full"
+                        />
+                      </div>
+                      
+                      {/* Speech Pitch */}
+                      <div className="mb-3">
+                        <label className="flex justify-between text-sm text-judicial-gray mb-1">
+                          <span>Pitch</span>
+                          <span>{speechPitch.toFixed(1)}</span>
+                        </label>
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="2"
+                          step="0.1"
+                          value={speechPitch}
+                          onChange={(e) => setSpeechPitch(parseFloat(e.target.value))}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400">
+                          <span>Low</span>
+                          <span>Normal</span>
+                          <span>High</span>
+                        </div>
+                      </div>
+                      
+                      <h4 className="font-medium text-judicial-blue mt-4 mb-3">Recording Options</h4>
+                      
+                      {/* Recording Duration */}
+                      <div className="mb-3">
+                        <label className="flex justify-between text-sm text-judicial-gray mb-1">
+                          <span>Recording Duration</span>
+                          <span>{recordingDuration} seconds</span>
+                        </label>
+                        <input
+                          type="range"
+                          min="2"
+                          max="15"
+                          step="1"
+                          value={recordingDuration}
+                          onChange={(e) => setRecordingDuration(parseInt(e.target.value))}
+                          className="w-full"
+                        />
+                      </div>
+                      
+                      {/* Auto-detect Language */}
+                      <div className="flex items-center mb-3">
+                        <input
+                          type="checkbox"
+                          id="autoDetectLanguage"
+                          checked={autoDetectLanguage}
+                          onChange={() => setAutoDetectLanguage(!autoDetectLanguage)}
+                          className="mr-2 h-4 w-4 text-judicial-blue focus:ring-judicial-blue"
+                        />
+                        <label htmlFor="autoDetectLanguage" className="text-sm text-judicial-gray">
+                          Auto-detect language
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                  
                   {recognitionError && (
                     <div className="text-red-500 text-sm mt-2">{recognitionError}</div>
                   )}
