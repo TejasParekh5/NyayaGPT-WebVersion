@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Index from "./pages/Index";
 import About from "./pages/About";
-import Chatbot from "./pages/Chatbot";
+import ChatbotNew from "./pages/ChatbotNew";
 import Learn from "./pages/Learn";
 import LegalAid from "./pages/LegalAid";
 import Multilingual from "./pages/Multilingual";
@@ -22,10 +22,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
+        <Routes>          <Route path="/" element={<Index />} />
           <Route path="/about" element={<About />} />
-          <Route path="/chatbot" element={<Chatbot />} />
+          <Route path="/chatbot" element={<ChatbotNew />} />
           <Route path="/learn" element={<Learn />} />
           <Route path="/legal-aid" element={<LegalAid />} />
           <Route path="/multilingual" element={<Multilingual />} />
