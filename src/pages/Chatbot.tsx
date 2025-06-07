@@ -10,13 +10,21 @@ interface Message {
 }
 
 const SampleQueries = [
+  // English
   "How do I file an FIR?",
   "What are my rights if I am arrested?",
   "How can I apply for legal aid in India?",
   "What are the steps for filing a consumer complaint?",
   "What documents are needed for property registration?",
+  // Hindi
   "मुझे FIR दर्ज करने के बारे में जानकारी चाहिए",
   "संपत्ति पंजीकरण के लिए क्या दस्तावेज़ आवश्यक हैं?",
+  // Bengali
+  "আমি কিভাবে একটি FIR দাখিল করব?",
+  // Tamil
+  "கைது செய்யப்பட்டால் என் உரிமைகள் என்ன?",
+  // Telugu
+  "భారతదేశంలో ఉచిత చట్ట సహాయం కోసం నేను ఎలా దరఖాస్తు చేసుకోవాలి?",
 ];
 
 const Chatbot = () => {
@@ -464,27 +472,36 @@ const Chatbot = () => {
                             : "bg-white text-judicial-gray border border-gray-200 shadow-sm"
                         }`}
                       >
-                        <p>{message.text}</p>
-                        <div
+                        <p>{message.text}</p>                        <div
                           className={`text-xs mt-1 ${
                             message.sender === "user" ? "text-blue-100" : "text-gray-400"
                           }`}
                         >
-                          {message.timestamp.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                          
-                          {/* Add speak button for bot messages */}
-                          {message.sender === "bot" && (
-                            <button 
-                              onClick={() => speakText(message.text)}
-                              className="ml-2 text-judicial-blue hover:text-judicial-orange"
-                              aria-label="Speak this message"
-                            >
-                              <Volume2 size={12} />
-                            </button>
-                          )}
+                          <div className="flex justify-between items-center">
+                            <span>
+                              {message.timestamp.toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            
+                            {/* Add speak button for bot messages */}
+                            {message.sender === "bot" && (
+                              <div className="flex items-center">
+                                <button 
+                                  onClick={() => speakText(message.text)}
+                                  className="ml-2 text-judicial-blue hover:text-judicial-orange"
+                                  aria-label="Speak this message"
+                                >
+                                  <Volume2 size={12} />
+                                </button>
+                                {/* Bhashini API indicator */}
+                                <span className="ml-2 text-xs italic text-judicial-blue">
+                                  via Bhashini API
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -539,9 +556,17 @@ const Chatbot = () => {
                 </div>
               </div>
 
-              {/* Disclaimer */}
-              <div className="mt-4 text-sm text-judicial-gray bg-yellow-50 border border-yellow-200 p-3 rounded-md">
-                <p><strong>Disclaimer:</strong> This AI assistant provides general legal information, not legal advice. For specific legal advice tailored to your situation, please consult a qualified legal professional.</p>
+              {/* Disclaimer and API info */}
+              <div className="mt-4 space-y-3">
+                <div className="text-sm text-judicial-gray bg-yellow-50 border border-yellow-200 p-3 rounded-md">
+                  <p><strong>Disclaimer:</strong> This AI assistant provides general legal information, not legal advice. For specific legal advice tailored to your situation, please consult a qualified legal professional.</p>
+                </div>
+                <div className="text-sm text-judicial-gray bg-blue-50 border border-blue-200 p-3 rounded-md flex items-center">
+                  <div className="mr-2">
+                    <img src="https://bhashini.gov.in/images/logo.svg" alt="Bhashini Logo" className="h-5" />
+                  </div>
+                  <p>Powered by <strong>Bhashini API</strong> - India's digital language translation platform</p>
+                </div>
               </div>
             </div>
           </div>
