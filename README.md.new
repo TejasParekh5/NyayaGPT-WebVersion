@@ -1,0 +1,82 @@
+# Welcome to NyaySetu - Legal Chatbot Application
+
+NyaySetu is a multilingual legal assistance chatbot designed to provide basic legal information to users in India. It supports multiple Indian languages using Bhashini API with Azure services integration as a fallback.
+
+## Features
+
+- **Multilingual Support**: Communicate in 10 Indian languages
+- **Speech Recognition**: Ask questions using voice input
+- **Text-to-Speech**: Listen to responses in your chosen language
+- **Legal Information**: Access basic legal information about FIRs, legal rights, property registration, and more
+- **Azure Integration**: Fallback to Azure services when Bhashini is unavailable
+
+## How can I edit this code?
+
+There are several ways of editing your application.
+
+**Use your preferred IDE**
+
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+
+Follow these steps:
+
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
+
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
+
+# Step 3: Install the necessary dependencies.
+npm i
+
+# Step 4: Start the development server with auto-reloading and an instant preview.
+npm run dev
+
+# step 5: Follow the steps to commit the changes from vs code to github repo. follow this steps after cloning repo
+git init
+
+# step 6: Replace "your name" and "your-email@example.com" with the name and email you use for your GitHub account.
+git config --global user.name "your name"
+git config --global user.email "your-email@example.com"
+
+# step 7: Make Your Changes in VS Code then do this.
+git add .
+git commit -m "Your commit message"
+git push origin main
+```
+
+**Edit a file directly in GitHub**
+
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
+
+## Documentation
+
+The NyaySetu project includes comprehensive documentation:
+
+| Document | Description |
+|----------|-------------|
+| [BHASHINI_API_INTEGRATION.md](./BHASHINI_API_INTEGRATION.md) | Explains the integration with Bhashini API for multilingual capabilities |
+| [AZURE_INTEGRATION.md](./AZURE_INTEGRATION.md) | **NEW!** Overview of Azure services integration as a fallback |
+| [AZURE_DEPLOYMENT.md](./AZURE_DEPLOYMENT.md) | **NEW!** Step-by-step guide for deploying to Azure App Service |
+| [AZURE_COGNITIVE_SERVICES.md](./AZURE_COGNITIVE_SERVICES.md) | **NEW!** Details on integrating Azure Cognitive Services |
+| [AZURE_SPEECH_SERVICES.md](./AZURE_SPEECH_SERVICES.md) | **NEW!** Implementation guide for Azure Speech Services |
+| [AZURE_COST_OPTIMIZATION.md](./AZURE_COST_OPTIMIZATION.md) | **NEW!** Strategies to stay within your 45 Azure credit budget |
+| [CHATBOT_RESPONSES.md](./CHATBOT_RESPONSES.md) | Documentation for the chatbot response database |
+
+## Testing Azure Integration
+
+To test the Azure services integration:
+
+```powershell
+# Make sure you have set up the required Azure services and added API keys to .env
+npm run test:azure
+```
+
+## License
+
+This project is licensed under the MIT License.

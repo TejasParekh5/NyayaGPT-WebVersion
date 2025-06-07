@@ -43,6 +43,21 @@ import {
   detectLanguage as bhashiniDetectLanguage
 } from './services/bhashiniService.js';
 
+// Import Azure service functions
+import { 
+  translateText as azureTranslateText,
+  detectLanguage as azureDetectLanguage
+} from './services/azureTranslatorService.js';
+
+import {
+  generateLegalResponse as azureGenerateLegalResponse
+} from './services/azureTextAnalyticsService.js';
+
+import {
+  speechToText as azureSpeechToText,
+  textToSpeech as azureTextToSpeech
+} from './services/azureSpeechService.js';
+
 // Bhashini API configuration from environment variables or defaults from the screenshot
 const BHASHINI_UDYAT_KEY = process.env.BHASHINI_UDYAT_KEY || '044ead971c-2c3c-4043-89e9-45e154285b18';
 const BHASHINI_INFERENCE_API_KEY = process.env.BHASHINI_INFERENCE_API_KEY || 'ur_lB-PKydyLBVz21RlFTLpSqRyuUslBSRf-G8byTEgXPS-dnB1B6VMhA61Ljal7';
@@ -95,8 +110,57 @@ app.post('/chat', async (req, res) => {
         return res.json({ reply: response });
       } catch (bhashiniError) {
         console.error('Error using Bhashini for response generation:', bhashiniError);
-        console.log('Falling back to local database...');
-        // Fall back to local database if Bhashini API fails
+        console.log('Trying Azure services as fallback...');
+        
+        // Try Azure Text Analytics as fallback
+        try {
+          const azureResponse = await azureGenerateLegalResponse(userMessage, effectiveLanguage);
+          
+          // Use the key phrases to find the best match in our database
+          if (azureResponse.keyPhrases && azureResponse.keyPhrases.length > 0) {
+            for (const phrase of azureResponse.keyPhrases) {
+              // Check if any key phrase matches with our database keywords
+              for (const [keyword, info] of Object.entries(legalDatabase)) {
+                if (phrase.toLowerCase().includes(keyword.toLowerCase()) || 
+                    keyword.toLowerCase().includes(phrase.toLowerCase())) {
+                  // Found a match
+                  let reply = info;
+                  
+                  // If language is not English, translate the response
+                  if (effectiveLanguage !== 'en') {
+                    try {
+                      // Try Bhashini first for translation
+                      reply = await bhashiniTranslateText(reply, 'en', effectiveLanguage);
+                    } catch (bhashiniTranslationError) {
+                      console.error('Bhashini translation error:', bhashiniTranslationError);
+                      // Fall back to Azure for translation
+                      try {
+                        reply = await azureTranslateText(reply, effectiveLanguage, 'en');
+                      } catch (azureTranslationError) {
+                        console.error('Azure translation error:', azureTranslationError);
+                      }
+                    }
+                  }
+                  
+                  return res.json({ 
+                    reply, 
+                    analysis: {
+                      sentiment: azureResponse.sentiment,
+                      confidence: azureResponse.confidenceScores,
+                      entityCount: azureResponse.entities.length
+                    }
+                  });
+                }
+              }
+            }
+          }
+          
+          // If no match found, continue to fallback to local database
+          console.log('No key phrase match found, falling back to local database...');
+        } catch (azureError) {
+          console.error('Error using Azure for response generation:', azureError);
+          console.log('Falling back to local database...');
+        }
       }
     }
     
@@ -253,11 +317,32 @@ app.post('/speech-to-text', async (req, res) => {
       return;
     }
     
-    // Real speech recognition request
+    // Get the audio data and language
+    const audio = req.body.audio; // Base64 encoded audio
+    const language = req.body.language || 'en';
+    
+    // Try Bhashini API first
+    try {
+      const transcription = await bhashiniSpeechToText(audio, language);
+      return res.json({ text: transcription });
+    } catch (bhashiniError) {
+      console.error('Error using Bhashini for speech-to-text:', bhashiniError);
+      console.log('Trying Azure Speech Services as fallback...');
+      
+      // Try Azure Speech Services as fallback
+      try {
+        const azureTranscription = await azureSpeechToText(audio, language);
+        return res.json({ text: azureTranscription });
+      } catch (azureError) {
+        console.error('Error using Azure for speech-to-text:', azureError);
+        console.log('Trying Google Speech API as final fallback...');
+      }
+    }
+    
+    // Final fallback: Google Speech API
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       // Using Google Speech API
       const speechClient = new SpeechClient();
-      const audio = req.body.audio; // Base64 encoded audio
       const audioBuffer = Buffer.from(audio, 'base64');
       
       const request = {
@@ -320,10 +405,53 @@ app.post('/speech-to-text', async (req, res) => {
 // Text-to-Speech endpoint
 app.post('/text-to-speech', async (req, res) => {
   try {
-    const { text, language } = req.body;
+    const { text, language, gender } = req.body;
     const languageCode = language || 'en';
+    const voiceGender = gender || 'female';
     
-    // Check which API to use
+    // Try Bhashini API first
+    if (BHASHINI_UDYAT_KEY && BHASHINI_INFERENCE_API_KEY) {
+      // Using Bhashini API
+      console.log("Using Bhashini API for text-to-speech");
+      
+      try {
+        // Get audio content from Bhashini API using the imported service
+        const audioContent = await bhashiniTextToSpeech(text, languageCode);
+        
+        // Generate unique filename
+        const filename = `speech-${Date.now()}.mp3`;
+        const audioPath = path.join(audioDir, filename);
+        
+        // Write audio to file
+        fs.writeFileSync(audioPath, audioContent);
+        
+        // Send the URL to the audio file
+        return res.json({ audioUrl: `/audio/${filename}` });
+      } catch (bhashiniError) {
+        console.error('Error using Bhashini for text-to-speech:', bhashiniError);
+        console.log('Trying Azure Speech Services as fallback...');
+        
+        // Try Azure Speech Services as fallback
+        try {
+          const azureAudioContent = await azureTextToSpeech(text, languageCode, voiceGender);
+          
+          // Generate unique filename
+          const filename = `speech-azure-${Date.now()}.mp3`;
+          const audioPath = path.join(audioDir, filename);
+          
+          // Write audio to file
+          fs.writeFileSync(audioPath, azureAudioContent);
+          
+          // Send the URL to the audio file
+          return res.json({ audioUrl: `/audio/${filename}` });
+        } catch (azureError) {
+          console.error('Error using Azure for text-to-speech:', azureError);
+          console.log('Trying Google Text-to-Speech API as final fallback...');
+        }
+      }
+    }
+    
+    // Final fallback: Google Text-to-Speech
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       // Using Google Text-to-Speech
       const ttsClient = new TextToSpeechClient();
@@ -345,15 +473,8 @@ app.post('/text-to-speech', async (req, res) => {
       fs.writeFileSync(audioPath, audioContent);
       
       // Send the URL to the audio file
-      res.json({ audioUrl: `/audio/${filename}` });    } else if (BHASHINI_UDYAT_KEY && BHASHINI_INFERENCE_API_KEY) {
-      // Using Bhashini API
-      console.log("Using Bhashini API for text-to-speech");
-      
-      try {
-        // Get audio content from Bhashini API using the imported service
-        const audioContent = await bhashiniTextToSpeech(text, languageCode);
-        
-        // Generate unique filename
+      res.json({ audioUrl: `/audio/${filename}` });
+    } else {
         const filename = `bhashini-speech-${Date.now()}.mp3`;
         const audioPath = path.join(audioDir, filename);
         
@@ -393,6 +514,16 @@ app.post('/text-to-speech', async (req, res) => {
 
 // Serve audio files
 app.use('/audio', express.static(audioDir));
+
+// Add the additional routes from separate files
+import translateRoute from './routes/translate.js';
+import detectLanguageRoute from './routes/detectLanguage.js';
+import analyzeLegalQueryRoute from './routes/analyzeLegalQuery.js';
+
+// Use the routes
+app.use(translateRoute);
+app.use(detectLanguageRoute);
+app.use(analyzeLegalQueryRoute);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

@@ -1,4 +1,14 @@
-# Welcome
+# Welcome to NyaySetu - Legal Chatbot Application
+
+NyaySetu is a multilingual legal assistance chatbot designed to provide basic legal information to users in India. It supports multiple Indian languages using Bhashini API with Azure services integration as a fallback.
+
+## Features
+
+- **Multilingual Support**: Communicate in 10 Indian languages
+- **Speech Recognition**: Ask questions using voice input
+- **Text-to-Speech**: Listen to responses in your chosen language
+- **Legal Information**: Access basic legal information about FIRs, legal rights, property registration, and more
+- **Azure Integration**: Fallback to Azure services when Bhashini is unavailable
 
 ## How can I edit this code?
 
