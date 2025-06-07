@@ -36,53 +36,7 @@ const Multilingual = () => {
       { phrase: "I need to file a police complaint", translation: "আমাকে একটি পুলিশ অভিযোগ দায়ের করতে হবে" },
       { phrase: "What are my consumer rights?", translation: "আমার ভোক্তা অধিকারগুলি কী কী?" },
       { phrase: "How to apply for legal aid", translation: "আইনি সহায়তার জন্য কীভাবে আবেদন করতে হয়" },
-    ],
-    ta: [
-      { phrase: "I need to file a police complaint", translation: "நான் போலீசாரிடம் புகார் செய்ய வேண்டும்" }, 
-      { phrase: "What are my consumer rights?", translation: "என் நுகர்வோர் உரிமைகள் என்ன?" },
-      { phrase: "How to apply for legal aid", translation: "சட்ட உதவிக்கு விண்ணப்பிக்க எப்படி" },
-    ],
-    te: [
-      { phrase: "I need to file a police complaint", translation: "నేను పోలీసు ఫిర్యాదు చేయాలి" },
-      { phrase: "What are my consumer rights?", translation: "నా వినియోగదారు హక్కులు ఏమిటి?" },
-      { phrase: "How to apply for legal aid", translation: "చట్టపరమైన సహాయానికి ఎలా దరఖాస్తు చేసుకోవాలి" },
-    ],
-    mr: [
-      { phrase: "I need to file a police complaint", translation: "माझी पोलिसांत तक्रार नोंदवायची आहे" },
-      { phrase: "What are my consumer rights?", translation: "माझे ग्राहक हक्क काय आहेत?" },
-      { phrase: "How to apply for legal aid", translation: "कायदेशीर सहाय्यासाठी अर्ज कसा करावा" },
-    ],
-    gu: [
-      { phrase: "I need to file a police complaint", translation: "મને પોલીસ ફરિયાદ નોંધાવવી છે" },
-      { phrase: "What are my consumer rights?", translation: "મારા ગ્રાહક અધિકારો શું છે?" },
-      { phrase: "How to apply for legal aid", translation: "કાયદેસર સહાય માટે કેવી રીતે અરજી કરવી" },
-    ],
-    kn: [
-      { phrase: "I need to file a police complaint", translation: "ನಾನು ಪೊಲೀಸ್ ದೂರು ದಾಖಲಿಸಬೇಕು" },
-      { phrase: "What are my consumer rights?", translation: "ನನ್ನ ಗ್ರಾಹಕ ಹಕ್ಕುಗಳು ಏನು?" },
-      { phrase: "How to apply for legal aid", translation: "ಕಾನೂನು ನೆರವಿಗೆ ಹೇಗೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಬೇಕು" },
-    ],
-    ml: [
-      { phrase: "I need to file a police complaint", translation: "എനിക്ക് പോലീസ് പരാതി നൽകണം" },
-      { phrase: "What are my consumer rights?", translation: "എന്റെ ഉപഭോക്തൃ അവകാശങ്ങൾ എന്തെല്ലാം?" },
-      { phrase: "How to apply for legal aid", translation: "നിയമ സഹായത്തിനായി എങ്ങനെ അപേക്ഷിക്കണം" },
-    ],
-    pa: [
-      { phrase: "I need to file a police complaint", translation: "ਮੈਨੂੰ ਪੁਲਿਸ ਵਿੱਚ ਸ਼ਿਕਾਇਤ ਦਰਜ ਕਰਵਾਉਣੀ ਹੈ" },
-      { phrase: "What are my consumer rights?", translation: "ਮੇਰੇ ਉਪਭੋਗਤਾ ਅਧਿਕਾਰ ਕੀ ਹਨ?" },
-      { phrase: "How to apply for legal aid", translation: "ਕਾਨੂੰਨੀ ਸਹਾਇਤਾ ਲਈ ਕਿਵੇਂ ਅਰਜ਼ੀ ਦੇਣੀ ਹੈ" },
-    ],
-    ur: [
-      { phrase: "I need to file a police complaint", translation: "مجھے پولیس میں شکایت درج کرانی ہے" },
-      { phrase: "What are my consumer rights?", translation: "میرے صارف کے حقوق کیا ہیں؟" },
-      { phrase: "How to apply for legal aid", translation: "قانونی امداد کے لیے درخواست کیسے دیں" },
-    ],
-    or: [
-      { phrase: "I need to file a police complaint", translation: "ମୋତେ ପୋଲିସ୍ ଅଭିଯୋଗ ଦାଖଲ କରିବାକୁ ହେବ" },
-      { phrase: "What are my consumer rights?", translation: "ମୋର ଉପଭୋକ୍ତା ଅଧିକାର କ'ଣ?" },
-      { phrase: "How to apply for legal aid", translation: "କାନୁନୀ ସାହାଯ୍ୟ ପାଇଁ କିପରି ଆବେଦନ କରିବେ" },
-    ],
-
+    ]
   };
 
   const getLegalPhrases = () => {

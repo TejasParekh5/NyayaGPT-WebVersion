@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import Layout from "../components/layout/Layout";
 import { Send, Mic, MicOff, Volume2, VolumeX, MessageSquare, Loader2 } from "lucide-react";
-import { useSpeechToText, useTextToSpeech } from "../utils/speechUtils";
 
 interface Message {
   id: number;
@@ -20,7 +19,7 @@ const SampleQueries = [
   "संपत्ति पंजीकरण के लिए क्या दस्तावेज़ आवश्यक हैं?",
 ];
 
-const ChatbotNew = () => {
+const Chatbot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -31,28 +30,19 @@ const ChatbotNew = () => {
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("en");
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [recognitionError, setRecognitionError] = useState<string | null>(null);
   
-  // Using our custom hooks for speech functionality
-  const { 
-    isRecording, 
-    transcript, 
-    error: speechError, 
-    isProcessing: isSpeechProcessing,
-    startRecording, 
-    stopRecording
-  } = useSpeechToText();
-  
-  const { 
-    isLoading: isSpeaking, 
-    error: speakError, 
-    speak, 
-    stop: stopSpeaking,
-    audioRef 
-  } = useTextToSpeech();
+  // Audio elements
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null); 
 
   const languages = [
     { code: "en", name: "English" },
@@ -65,8 +55,6 @@ const ChatbotNew = () => {
     { code: "mr", name: "मराठी (Marathi)" },
     { code: "gu", name: "ગુજરાતી (Gujarati)" },
     { code: "pa", name: "ਪੰਜਾਬੀ (Punjabi)" },
-    { code: "ur", name: "اردو (Urdu)" },
-    { code: "or", name: "ଓଡ଼ିଆ (Odia)" },
   ];
 
   const scrollToBottom = () => {
@@ -78,24 +66,28 @@ const ChatbotNew = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-  
-  // Listen for transcript changes from speech recognition
-  useEffect(() => {
-    if (transcript) {
-      setInput(transcript);
-      // Automatically send the message when we get a transcript
-      setTimeout(() => {
-        handleSendMessage(transcript);
-      }, 500);
-    }
-  }, [transcript]);
 
-  const handleSendMessage = async (messageText: string = input) => {
-    if (!messageText.trim()) return;
+  // Initialize audio context and speech recognition
+  useEffect(() => {
+    // Create audio element for TTS playback
+    const audio = new Audio();
+    audioRef.current = audio;
+    
+    // Clean up on component unmount
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      stopRecording();
+    };
+  }, []);
+
+  const handleSendMessage = async () => {
+    if (input.trim() === "") return;
 
     const userMessage: Message = {
       id: messages.length + 1,
-      text: messageText,
+      text: input,
       sender: "user",
       timestamp: new Date(),
     };
@@ -109,7 +101,7 @@ const ChatbotNew = () => {
       const response = await fetch("http://localhost:5000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageText, language: selectedLanguage }),
+        body: JSON.stringify({ message: input, language: selectedLanguage }),
       });
       
       if (!response.ok) {
@@ -126,9 +118,9 @@ const ChatbotNew = () => {
       
       setMessages((prevMessages) => [...prevMessages, botMessage]);
       
-      // Auto speak the response if we were triggered by voice
-      if (transcript) {
-        speak(data.reply, selectedLanguage);
+      // If text-to-speech is active, speak the response
+      if (isSpeaking) {
+        speakText(data.reply);
       }
     } catch (err) {
       console.error("Error sending message:", err);
@@ -150,29 +142,204 @@ const ChatbotNew = () => {
     e.preventDefault();
     handleSendMessage();
   };
+  // Function to start recording audio
+  const startRecording = async () => {
+    setRecognitionError(null);
+    try {
+      // First try to get microphone permissions
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        processAudio(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+
+      // Set a timeout to automatically stop recording after 5 seconds
+      // This is for demonstration purposes only and should be changed in production
+      setTimeout(() => {
+        if (isRecording && mediaRecorderRef.current) {
+          stopRecording();
+        }
+      }, 5000);
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      setRecognitionError("Could not access microphone. Please check permissions.");
+      
+      // If we can't access the microphone, we'll simulate recording
+      setIsRecording(true);
+      setTimeout(() => {
+        // Simulate processing with backend
+        setIsRecording(false);
+        simulateSpeechRecognition();
+      }, 3000);
+    }
+  };
+
+  // Function to stop recording audio
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      
+      // Also stop all audio tracks
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+    }
+  };
+  // Simulate speech recognition when we can't access the microphone
+  const simulateSpeechRecognition = async () => {
+    try {
+      setIsTyping(true);
+      
+      // Call our backend to get simulated text
+      const response = await fetch('http://localhost:5000/speech-to-text', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          simulatedRequest: true,
+          language: selectedLanguage,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.text) {
+        setInput(data.text);
+        setTimeout(() => {
+          handleSendMessage();
+        }, 500);
+      } else {
+        setRecognitionError("Could not recognize speech. Please try again.");
+      }
+      
+      setIsTyping(false);
+    } catch (error) {
+      console.error("Error in simulated speech recognition:", error);
+      setRecognitionError("Error processing speech. Please try again.");
+      setIsTyping(false);
+    }
+  };
+
+  // Process recorded audio for speech-to-text conversion
+  const processAudio = async (audioBlob: Blob) => {
+    try {
+      setIsTyping(true); // Show typing indicator while processing
+      
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Audio = reader.result?.toString().split(',')[1];
+        
+        if (base64Audio) {
+          // Send to our API for speech recognition
+          const response = await fetch('http://localhost:5000/speech-to-text', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              audio: base64Audio,
+              language: selectedLanguage,
+            }),
+          });
+          
+          const data = await response.json();
+          
+          if (data.text) {
+            setInput(data.text);
+            setTimeout(() => {
+              handleSendMessage();
+            }, 500);
+          } else {
+            setRecognitionError("Could not recognize speech. Please try again.");
+          }
+        }
+        setIsTyping(false);
+      };
+      
+      reader.readAsDataURL(audioBlob);
+    } catch (error) {
+      console.error("Error processing audio:", error);
+      setRecognitionError("Error processing audio. Please try again.");
+      setIsTyping(false);
+    }
+  };
 
   // Toggle recording state
   const toggleRecording = () => {
     if (isRecording) {
       stopRecording();
     } else {
-      // Add a message indicating we're listening
-      const listeningMessage: Message = {
-        id: messages.length + 1,
-        text: `Listening in ${languages.find(l => l.code === selectedLanguage)?.name}...`,
-        sender: "bot",
-        timestamp: new Date(),
-      };
-      setMessages([...messages, listeningMessage]);
-      
-      // Start recording with the selected language
-      startRecording(selectedLanguage);
+      startRecording();
     }
   };
 
-  // Play text using text-to-speech
-  const handleSpeakText = (text: string) => {
-    speak(text, selectedLanguage);
+  // Text-to-Speech functionality
+  const speakText = async (text: string) => {
+    if (!text) return;
+    
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      
+      // Call text-to-speech API
+      const response = await fetch('http://localhost:5000/text-to-speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          language: selectedLanguage,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      // If we have a real audio URL (not from placeholder response)
+      if (data.audioUrl) {
+        setAudioUrl(`http://localhost:5000${data.audioUrl}`);
+        if (audioRef.current) {
+          audioRef.current.src = `http://localhost:5000${data.audioUrl}`;
+          audioRef.current.play();
+        }
+      }
+    } catch (error) {
+      console.error("Error in text-to-speech:", error);
+    }
+  };
+
+  // Toggle speaking state and speak the last bot message if enabled
+  const toggleSpeaking = () => {
+    const newSpeakingState = !isSpeaking;
+    setIsSpeaking(newSpeakingState);
+    
+    if (newSpeakingState) {
+      // Find the last bot message and speak it
+      const lastBotMessage = [...messages].reverse().find(msg => msg.sender === 'bot');
+      if (lastBotMessage) {
+        speakText(lastBotMessage.text);
+      }
+    } else if (audioRef.current) {
+      // Stop speaking
+      audioRef.current.pause();
+    }
   };
 
   const handleSampleQuery = (query: string) => {
@@ -233,13 +400,13 @@ const ChatbotNew = () => {
                   ))}
                 </ul>
               </div>
-              
+
               {/* Accessibility Options */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <h3 className="text-xl font-serif text-judicial-blue mb-4">Accessibility</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-judicial-gray">Speech to Text</span>
+                    <span className="text-judicial-gray">Voice Input</span>
                     <button
                       onClick={toggleRecording}
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
@@ -247,26 +414,23 @@ const ChatbotNew = () => {
                       }`}
                       aria-label={isRecording ? "Stop recording" : "Start recording"}
                     >
-                      {isRecording || isSpeechProcessing ? <Loader2 className="animate-spin" size={18} /> : <Mic size={18} />}
+                      {isRecording ? <Loader2 className="animate-spin" size={18} /> : <Mic size={18} />}
                     </button>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-judicial-gray">Text-to-Speech</span>
                     <button
-                      onClick={() => {
-                        const lastBotMessage = [...messages].reverse().find(msg => msg.sender === 'bot');
-                        if (lastBotMessage) handleSpeakText(lastBotMessage.text);
-                      }}
+                      onClick={toggleSpeaking}
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                         isSpeaking ? "bg-judicial-blue text-white" : "bg-gray-100 text-judicial-gray"
                       }`}
-                      aria-label={isSpeaking ? "Stop speaking" : "Speak last message"}
+                      aria-label={isSpeaking ? "Turn off text-to-speech" : "Turn on text-to-speech"}
                     >
-                      {isSpeaking ? <Loader2 className="animate-spin" size={18} /> : <Volume2 size={18} />}
+                      {isSpeaking ? <Volume2 size={18} /> : <VolumeX size={18} />}
                     </button>
                   </div>
-                  {(speechError || speakError) && (
-                    <div className="text-red-500 text-sm mt-2">{speechError || speakError}</div>
+                  {recognitionError && (
+                    <div className="text-red-500 text-sm mt-2">{recognitionError}</div>
                   )}
                 </div>
               </div>
@@ -314,7 +478,7 @@ const ChatbotNew = () => {
                           {/* Add speak button for bot messages */}
                           {message.sender === "bot" && (
                             <button 
-                              onClick={() => handleSpeakText(message.text)}
+                              onClick={() => speakText(message.text)}
                               className="ml-2 text-judicial-blue hover:text-judicial-orange"
                               aria-label="Speak this message"
                             >
@@ -350,7 +514,7 @@ const ChatbotNew = () => {
                           isRecording ? "text-red-500" : "text-gray-400 hover:text-judicial-blue"
                         }`}
                       >
-                        {isRecording || isSpeechProcessing ? <Loader2 className="animate-spin" size={20} /> : <Mic size={20} />}
+                        {isRecording ? <Loader2 className="animate-spin" size={20} /> : <Mic size={20} />}
                       </button>
                       <input
                         type="text"
@@ -385,9 +549,9 @@ const ChatbotNew = () => {
       </section>
       
       {/* Hidden audio element for playing TTS */}
-      <audio className="hidden" ref={audioRef} />
+      <audio ref={audioRef} className="hidden" />
     </Layout>
   );
 };
 
-export default ChatbotNew;
+export default Chatbot;
