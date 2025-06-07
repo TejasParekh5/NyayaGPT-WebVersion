@@ -96,14 +96,12 @@ app.post('/chat', async (req, res) => {
   try {
     const userMessage = req.body.message;
     const language = req.body.language || 'en';
-    
+
     console.log(`Processing chat message in ${language}: ${userMessage}`);
-    
-    // First, try to detect if the message is in Hindi directly
-    const isHindiMessage = /[\u0900-\u097F]/.test(userMessage); // Check for Hindi Unicode range
+
+    const isHindiMessage = /[\u0900-\u097F]/.test(userMessage);
     const effectiveLanguage = isHindiMessage ? 'hi' : language;
-    
-    // Try to use Bhashini API for generating a response
+
     if (BHASHINI_UDYAT_KEY && BHASHINI_INFERENCE_API_KEY) {
       try {
         const response = await bhashiniGenerateResponse(userMessage, effectiveLanguage);
@@ -111,29 +109,22 @@ app.post('/chat', async (req, res) => {
       } catch (bhashiniError) {
         console.error('Error using Bhashini for response generation:', bhashiniError);
         console.log('Trying Azure services as fallback...');
-        
-        // Try Azure Text Analytics as fallback
+
         try {
           const azureResponse = await azureGenerateLegalResponse(userMessage, effectiveLanguage);
-          
-          // Use the key phrases to find the best match in our database
           if (azureResponse.keyPhrases && azureResponse.keyPhrases.length > 0) {
             for (const phrase of azureResponse.keyPhrases) {
-              // Check if any key phrase matches with our database keywords
               for (const [keyword, info] of Object.entries(legalDatabase)) {
-                if (phrase.toLowerCase().includes(keyword.toLowerCase()) || 
-                    keyword.toLowerCase().includes(phrase.toLowerCase())) {
-                  // Found a match
+                if (
+                  phrase.toLowerCase().includes(keyword.toLowerCase()) ||
+                  keyword.toLowerCase().includes(phrase.toLowerCase())
+                ) {
                   let reply = info;
-                  
-                  // If language is not English, translate the response
                   if (effectiveLanguage !== 'en') {
                     try {
-                      // Try Bhashini first for translation
                       reply = await bhashiniTranslateText(reply, 'en', effectiveLanguage);
                     } catch (bhashiniTranslationError) {
                       console.error('Bhashini translation error:', bhashiniTranslationError);
-                      // Fall back to Azure for translation
                       try {
                         reply = await azureTranslateText(reply, effectiveLanguage, 'en');
                       } catch (azureTranslationError) {
@@ -141,21 +132,18 @@ app.post('/chat', async (req, res) => {
                       }
                     }
                   }
-                  
-                  return res.json({ 
-                    reply, 
+                  return res.json({
+                    reply,
                     analysis: {
                       sentiment: azureResponse.sentiment,
                       confidence: azureResponse.confidenceScores,
-                      entityCount: azureResponse.entities.length
-                    }
+                      entityCount: azureResponse.entities.length,
+                    },
                   });
                 }
               }
             }
           }
-          
-          // If no match found, continue to fallback to local database
           console.log('No key phrase match found, falling back to local database...');
         } catch (azureError) {
           console.error('Error using Azure for response generation:', azureError);
@@ -163,47 +151,38 @@ app.post('/chat', async (req, res) => {
         }
       }
     }
-    
-    // Fallback to local database
-    let defaultReply = effectiveLanguage === 'hi' 
-      ? "मुझे इस विषय पर अभी जानकारी नहीं है। कृपया एफआईआर दर्ज करने, गिरफ्तारी अधिकारों, कानूनी सहायता, उपभोक्ता शिकायत, या संपत्ति पंजीकरण के बारे में पूछें।"
-      : "I'm sorry, I don't have information on that topic yet. Please try asking about FIR filing, arrest rights, legal aid, consumer complaints, or property registration.";
-    
+
+    let defaultReply =
+      effectiveLanguage === 'hi'
+        ? 'मुझे इस विषय पर अभी जानकारी नहीं है। कृपया एफआईआर दर्ज करने, गिरफ्तारी अधिकारों, कानूनी सहायता, उपभोक्ता शिकायत, या संपत्ति पंजीकरण के बारे में पूछें।'
+        : "I'm sorry, I don't have information on that topic yet. Please try asking about FIR filing, arrest rights, legal aid, consumer complaints, or property registration.";
+
     let reply = defaultReply;
     let foundMatch = false;
-    
-    // For Hindi messages, first check for direct Hindi matches
+
     if (isHindiMessage) {
-      Object.entries(legalDatabase).forEach(([keyword, info]) => {
-        // Check if keyword contains Hindi characters and is in the message
+      Object.entries(legalDatabase).forEach(async ([keyword, info]) => {
         if (/[\u0900-\u097F]/.test(keyword) && userMessage.toLowerCase().includes(keyword.toLowerCase())) {
           reply = info;
           foundMatch = true;
         }
       });
-      
-      // If no direct Hindi match, try to translate and match with English keywords
+
       if (!foundMatch) {
         try {
           const translatedMessage = await bhashiniTranslateText(userMessage, 'hi', 'en');
           const searchMsg = translatedMessage.toLowerCase();
-          
-          Object.entries(legalDatabase).forEach(([keyword, info]) => {
-            // Only check English keywords
+
+          Object.entries(legalDatabase).forEach(async ([keyword, info]) => {
             if (!/[\u0900-\u097F]/.test(keyword) && searchMsg.includes(keyword.toLowerCase())) {
-              // Found a match with English keyword, get the Hindi response
               const hindiKey = getHindiEquivalent(keyword);
               if (hindiKey && legalDatabase[hindiKey]) {
                 reply = legalDatabase[hindiKey];
               } else {
-                // Translate the English response to Hindi
                 try {
-                  bhashiniTranslateText(info, 'en', 'hi').then(translatedReply => {
-                    reply = translatedReply;
-                  });
+                  reply = await bhashiniTranslateText(info, 'en', 'hi');
                 } catch (translationError) {
                   console.error('Translation error:', translationError);
-                  // Use English reply as fallback
                   reply = info;
                 }
               }
@@ -214,10 +193,7 @@ app.post('/chat', async (req, res) => {
           console.error('Translation error:', translationError);
         }
       }
-    } 
-    // For English or other language messages
-    else {
-      // If message is not in English and not in Hindi, translate to English first
+    } else {
       let searchMessage = userMessage.toLowerCase();
       if (language !== 'en' && !isHindiMessage) {
         try {
@@ -225,30 +201,25 @@ app.post('/chat', async (req, res) => {
           searchMessage = searchMessage.toLowerCase();
         } catch (translationError) {
           console.error('Translation error:', translationError);
-          // Continue with the original message if translation fails
         }
       }
-      
-      // Simple keyword matching for English database
+
       Object.entries(legalDatabase).forEach(([keyword, info]) => {
-        // Skip Hindi keywords for non-Hindi messages
         if (!/[\u0900-\u097F]/.test(keyword) && searchMessage.includes(keyword.toLowerCase())) {
           reply = info;
           foundMatch = true;
         }
       });
-      
-      // If language is not English, translate the response back
+
       if (language !== 'en' && reply !== defaultReply) {
         try {
           reply = await bhashiniTranslateText(reply, 'en', language);
         } catch (translationError) {
           console.error('Translation error for response:', translationError);
-          // Continue with English response if translation fails
         }
       }
     }
-    
+
     res.json({ reply });
   } catch (error) {
     console.error('Error in chat endpoint:', error);
@@ -283,7 +254,7 @@ const additionalEntries = {
   
   // Telugu entries
   "FIR దాఖలు": "భారతదేశంలో FIR (ఫస్ట్ ఇన్ఫర్మేషన్ రిపోర్ట్) దాఖలు చేయడానికి, మీ స్థానిక పోలీస్ స్టేషన్‌కి వెళ్లండి. సంఘటన గురించి వివరాలు అందించండి, సమయం, ప్రదేశం మరియు పాల్గొన్న వ్యక్తులు. కాగ్నిజబుల్ నేరాలకు పోలీసులు మీ FIRని నమోదు చేయాల్సిన బాధ్యత ఉంది.",
-  "అరెస్ట్ హక్కులు": "భారతదేశంలో అరెస్టు చేయబడితే, మీకు అరెస్టు కారణాలు తెలుసుకునే హక్కు, చట్టపరమైన ప్రాతినిధ్యం పొందే హక్కు, బంధువు/స్నేహితుడికి తెలియజేసే హక్కు, 24 గంటల్లోపు మెజిస్ట్రేట్ ముందు హాజరుపరిచే హక్కు, బెయిల్ హక్కు (బెయిలబుల్ అపరాధాలకు), చిత్రహింసల నుండి రక్షణ మరియు న్యాయమైన విచారణకు హక్కు.",
+  "అరెస్ట్ హక్కులు": "భారతదేశంలో అరెస్టు చేయబడితే, మీకు అరెస్టు కారణాలు తెలుసుకునే హక్కు, చట్టపరమైన ప్రాతినిధ్యం పొందే హక్కు, బంధువు/స్నేహితుడికి తెలియజేసే హక్కు, 24 గంటల్లోపు మెజిస్ట్రేట్ ముందు హాజరుపరిచే హక్కు, బెయిల్ హక్కు (బెయిల్‌బుల్ అపరాధాలకు), చిత్రహింసల నుండి రక్షణ మరియు న్యాయమైన విచారణకు హక్కు.",
   
   // Add these entries to the legal database
 };
@@ -296,219 +267,137 @@ Object.entries(additionalEntries).forEach(([key, value]) => {
 // Speech-to-Text endpoint
 app.post('/speech-to-text', async (req, res) => {
   try {
-    // Check if this is a simulated request (no audio data)
-    if (req.body.simulatedRequest) {
-      console.log("Handling simulated speech recognition request");
-      
-      // Generate simulated response based on language
-      let simulatedText = "How do I file an FIR?"; // Default English
-      const lang = req.body.language || 'en';
-      
-      if (lang === 'hi') {
-        simulatedText = "मुझे FIR दर्ज करने के बारे में जानकारी चाहिए";
-      } else if (lang === 'ta') {
-        simulatedText = "FIR பதிவு செய்வது எப்படி?";
-      }
-      
-      // Simulate processing delay
-      setTimeout(() => {
-        res.json({ text: simulatedText });
-      }, 1000);
-      return;
-    }
-    
-    // Get the audio data and language
     const audio = req.body.audio; // Base64 encoded audio
     const language = req.body.language || 'en';
-    
-    // Try Bhashini API first
-    try {
-      const transcription = await bhashiniSpeechToText(audio, language);
-      return res.json({ text: transcription });
-    } catch (bhashiniError) {
-      console.error('Error using Bhashini for speech-to-text:', bhashiniError);
-      console.log('Trying Azure Speech Services as fallback...');
-      
-      // Try Azure Speech Services as fallback
-      try {
-        const azureTranscription = await azureSpeechToText(audio, language);
-        return res.json({ text: azureTranscription });
-      } catch (azureError) {
-        console.error('Error using Azure for speech-to-text:', azureError);
-        console.log('Trying Google Speech API as final fallback...');
-      }
+
+    if (req.body.simulatedRequest) {
+      console.log('Handling simulated speech recognition request');
+      const simulatedText = language === 'hi'
+        ? 'मुझे FIR दर्ज करने के बारे में जानकारी चाहिए'
+        : 'How do I file an FIR?';
+      return res.json({ text: simulatedText });
     }
-    
-    // Final fallback: Google Speech API
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      // Using Google Speech API
-      const speechClient = new SpeechClient();
-      const audioBuffer = Buffer.from(audio, 'base64');
-      
-      const request = {
-        audio: {
-          content: audioBuffer.toString('base64'),
-        },
-        config: {
-          encoding: 'LINEAR16',
-          sampleRateHertz: 16000,
-          languageCode: req.body.language || 'en-IN',
-        },
-      };
-      
-      const [response] = await speechClient.recognize(request);
-      const transcription = response.results
-        .map(result => result.alternatives[0].transcript)
-        .join('\n');
-      
-      res.json({ text: transcription });    } else if (BHASHINI_UDYAT_KEY && BHASHINI_INFERENCE_API_KEY) {
-      // Using Bhashini API
-      console.log("Using Bhashini API for speech recognition");
-      const audio = req.body.audio; // Base64 encoded audio
-      const language = req.body.language || 'en';
-      
+
+    if (BHASHINI_UDYAT_KEY && BHASHINI_INFERENCE_API_KEY) {
       try {
-        // Use the bhashiniSpeechToText from the imported service
         const transcription = await bhashiniSpeechToText(audio, language);
         console.log('Bhashini transcription result:', transcription);
-        res.json({ text: transcription });
+        return res.json({ text: transcription });
       } catch (bhashiniError) {
         console.error('Bhashini API error:', bhashiniError);
-        // Fallback to simulation if Bhashini API fails
-        const simulatedText = language === 'hi' 
-          ? "मुझे FIR दर्ज करने के बारे में जानकारी चाहिए" 
-          : "How do I file an FIR?";
-        res.json({ text: simulatedText });
+        console.log('Trying Azure Speech Services as fallback...');
+
+        try {
+          const azureTranscription = await azureSpeechToText(audio, language);
+          return res.json({ text: azureTranscription });
+        } catch (azureError) {
+          console.error('Error using Azure for speech-to-text:', azureError);
+          console.log('Trying Google Speech API as final fallback...');
+
+          if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            try {
+              const speechClient = new SpeechClient();
+              const audioBuffer = Buffer.from(audio, 'base64');
+
+              const request = {
+                audio: {
+                  content: audioBuffer.toString('base64'),
+                },
+                config: {
+                  encoding: 'LINEAR16',
+                  sampleRateHertz: 16000,
+                  languageCode: language,
+                },
+              };
+
+              const [response] = await speechClient.recognize(request);
+              const transcription = response.results
+                .map(result => result.alternatives[0].transcript)
+                .join('\n');
+
+              return res.json({ text: transcription });
+            } catch (googleError) {
+              console.error('Google Speech API error:', googleError);
+              res.status(500).json({ error: 'Speech recognition failed' });
+            }
+          } else {
+            res.status(500).json({ error: 'No valid speech recognition service available' });
+          }
+        }
       }
     } else {
-      // No API credentials available - simulate
-      console.log("No API credentials available, using simulation");
-      let simulatedText = "How do I file an FIR?";
-      const lang = req.body.language || 'en';
-      
-      if (lang === 'hi') {
-        simulatedText = "मुझे FIR दर्ज करने के बारे में जानकारी चाहिए";
-      } else if (lang === 'ta') {
-        simulatedText = "FIR பதிவு செய்வது எப்படி?";
-      }
-      
-      setTimeout(() => {
-        res.json({ text: simulatedText });
-      }, 1000);
+      res.status(500).json({ error: 'No valid speech recognition service available' });
     }
   } catch (error) {
     console.error('Error in speech-to-text endpoint:', error);
-    res.status(500).json({ error: 'Speech recognition failed' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Text-to-Speech endpoint
 app.post('/text-to-speech', async (req, res) => {
   try {
-    const { text, language, gender } = req.body;
-    const languageCode = language || 'en';
-    const voiceGender = gender || 'female';
-    
-    // Try Bhashini API first
+    const text = req.body.text;
+    const languageCode = req.body.languageCode || 'en';
+    const voiceGender = req.body.voiceGender || 'NEUTRAL';
+
     if (BHASHINI_UDYAT_KEY && BHASHINI_INFERENCE_API_KEY) {
-      // Using Bhashini API
-      console.log("Using Bhashini API for text-to-speech");
-      
       try {
-        // Get audio content from Bhashini API using the imported service
         const audioContent = await bhashiniTextToSpeech(text, languageCode);
-        
-        // Generate unique filename
+
         const filename = `speech-${Date.now()}.mp3`;
         const audioPath = path.join(audioDir, filename);
-        
-        // Write audio to file
         fs.writeFileSync(audioPath, audioContent);
-        
-        // Send the URL to the audio file
+
         return res.json({ audioUrl: `/audio/${filename}` });
       } catch (bhashiniError) {
         console.error('Error using Bhashini for text-to-speech:', bhashiniError);
         console.log('Trying Azure Speech Services as fallback...');
-        
-        // Try Azure Speech Services as fallback
+
         try {
           const azureAudioContent = await azureTextToSpeech(text, languageCode, voiceGender);
-          
-          // Generate unique filename
+
           const filename = `speech-azure-${Date.now()}.mp3`;
           const audioPath = path.join(audioDir, filename);
-          
-          // Write audio to file
           fs.writeFileSync(audioPath, azureAudioContent);
-          
-          // Send the URL to the audio file
+
           return res.json({ audioUrl: `/audio/${filename}` });
         } catch (azureError) {
           console.error('Error using Azure for text-to-speech:', azureError);
           console.log('Trying Google Text-to-Speech API as final fallback...');
+
+          if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            try {
+              const ttsClient = new TextToSpeechClient();
+              const request = {
+                input: { text },
+                voice: { languageCode: `${languageCode}-IN`, ssmlGender: voiceGender },
+                audioConfig: { audioEncoding: 'MP3' },
+              };
+
+              const [response] = await ttsClient.synthesizeSpeech(request);
+              const audioContent = response.audioContent;
+
+              const filename = `speech-${Date.now()}.mp3`;
+              const audioPath = path.join(audioDir, filename);
+              fs.writeFileSync(audioPath, audioContent);
+
+              return res.json({ audioUrl: `/audio/${filename}` });
+            } catch (googleError) {
+              console.error('Google Text-to-Speech API error:', googleError);
+              res.status(500).json({ error: 'Text-to-speech failed' });
+            }
+          } else {
+            res.status(500).json({ error: 'No valid text-to-speech service available' });
+          }
         }
       }
-    }
-    
-    // Final fallback: Google Text-to-Speech
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      // Using Google Text-to-Speech
-      const ttsClient = new TextToSpeechClient();
-      
-      const request = {
-        input: { text },
-        voice: { languageCode: `${languageCode}-IN`, ssmlGender: 'NEUTRAL' },
-        audioConfig: { audioEncoding: 'MP3' },
-      };
-      
-      const [response] = await ttsClient.synthesizeSpeech(request);
-      const audioContent = response.audioContent;
-      
-      // Generate unique filename
-      const filename = `speech-${Date.now()}.mp3`;
-      const audioPath = path.join(audioDir, filename);
-      
-      // Write audio to file
-      fs.writeFileSync(audioPath, audioContent);
-      
-      // Send the URL to the audio file
-      res.json({ audioUrl: `/audio/${filename}` });
     } else {
-        const filename = `bhashini-speech-${Date.now()}.mp3`;
-        const audioPath = path.join(audioDir, filename);
-        
-        // Write audio to file
-        fs.writeFileSync(audioPath, Buffer.from(audioContent));
-        
-        // Send the URL to the audio file
-        console.log(`Generated audio file: ${filename}`);
-        res.json({ audioUrl: `/audio/${filename}` });
-      } catch (bhashiniError) {
-        console.error('Bhashini API error:', bhashiniError);
-        // Fallback to sample audio if Bhashini API fails
-        res.json({ audioUrl: `/audio/sample-audio.mp3` });
-      }
-    } else {
-      // For development without credentials, use a static sample audio file
-      console.log("Using fallback TTS simulation");
-      
-      // Create a simple audio file if it doesn't exist
-      const sampleAudioPath = path.join(audioDir, 'sample-audio.mp3');
-      if (!fs.existsSync(sampleAudioPath)) {
-        // Create an empty file as placeholder (you'd want a real MP3 file here)
-        fs.writeFileSync(sampleAudioPath, '');
-        console.log("Created placeholder audio file. Replace with real MP3 for proper testing.");
-      }
-      
-      // Send the URL to the static audio file
-      setTimeout(() => {
-        res.json({ audioUrl: `/audio/sample-audio.mp3` });
-      }, 1000);
+      res.status(500).json({ error: 'No valid text-to-speech service available' });
     }
   } catch (error) {
     console.error('Error in text-to-speech endpoint:', error);
-    res.status(500).json({ error: 'Text-to-speech conversion failed' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
