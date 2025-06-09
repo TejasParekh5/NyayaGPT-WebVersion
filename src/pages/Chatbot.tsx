@@ -106,7 +106,7 @@ const Chatbot = () => {
 
     // Call backend API for bot response
     try {
-      const response = await fetch("http://localhost:5000/chat", {
+      const response = await fetch("http://localhost:8181/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: input, language: selectedLanguage }),
@@ -213,7 +213,7 @@ const Chatbot = () => {
       setIsTyping(true);
       
       // Call our backend to get simulated text
-      const response = await fetch('http://localhost:5000/speech-to-text', {
+      const response = await fetch('http://localhost:8181/speech-to-text', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -255,7 +255,7 @@ const Chatbot = () => {
         
         if (base64Audio) {
           // Send to our API for speech recognition
-          const response = await fetch('http://localhost:5000/speech-to-text', {
+          const response = await fetch('http://localhost:8181/speech-to-text', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -307,7 +307,7 @@ const Chatbot = () => {
       }
       
       // Call text-to-speech API
-      const response = await fetch('http://localhost:5000/text-to-speech', {
+      const response = await fetch('http://localhost:8181/text-to-speech', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -322,9 +322,9 @@ const Chatbot = () => {
       
       // If we have a real audio URL (not from placeholder response)
       if (data.audioUrl) {
-        setAudioUrl(`http://localhost:5000${data.audioUrl}`);
+        setAudioUrl(`http://localhost:8181${data.audioUrl}`);
         if (audioRef.current) {
-          audioRef.current.src = `http://localhost:5000${data.audioUrl}`;
+          audioRef.current.src = `http://localhost:8181${data.audioUrl}`;
           audioRef.current.play();
         }
       }

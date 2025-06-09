@@ -14,7 +14,7 @@ import axios from 'axios';
 
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8181;
 
 // Middleware
 app.use(cors({
@@ -58,6 +58,8 @@ import {
   textToSpeech as azureTextToSpeech
 } from './services/azureSpeechService.js';
 
+import { azureOpenAIChat } from './services/azureOpenAIService.js';
+
 // Bhashini API configuration from environment variables or defaults from the screenshot
 const BHASHINI_UDYAT_KEY = process.env.BHASHINI_UDYAT_KEY || '044ead971c-2c3c-4043-89e9-45e154285b18';
 const BHASHINI_INFERENCE_API_KEY = process.env.BHASHINI_INFERENCE_API_KEY || 'ur_lB-PKydyLBVz21RlFTLpSqRyuUslBSRf-G8byTEgXPS-dnB1B6VMhA61Ljal7';
@@ -91,138 +93,26 @@ const legalDatabase = {
   "संपत्ति दस्तावेज": "भारत में संपत्ति पंजीकरण के लिए आवश्यक दस्तावेज़ हैं: 1) बिक्री विलेख/हस्तांतरण विलेख, 2) संपत्ति स्वामित्व दस्तावेज़, 3) हाउसिंग सोसाइटी से अनापत्ति प्रमाण पत्र (यदि लागू हो), 4) निर्माण अनुमोदन योजनाएँ, 5) भूमि उपयोग रूपांतरण प्रमाणपत्र (यदि लागू हो), 6) संपत्ति कर रसीदें, 7) सभी संबंधित पक्षों के पहचान प्रमाण (आधार कार्ड, पैन कार्ड, पासपोर्ट, मतदाता पहचान पत्र), 8) पासपोर्ट आकार की तस्वीरें, 9) गैर-ऋणभार प्रमाणपत्र, और 10) यदि उपलब्ध हो तो पिछले स्वामित्व दस्तावेज।"
 };
 
-// Chat Endpoint with Bhashini Integration
+// Chat Endpoint with Azure OpenAI for all answers
 app.post('/chat', async (req, res) => {
+  console.log('DEBUG: /chat endpoint hit with message:', req.body.message, 'language:', req.body.language);
   try {
     const userMessage = req.body.message;
     const language = req.body.language || 'en';
-
-    console.log(`Processing chat message in ${language}: ${userMessage}`);
-
-    const isHindiMessage = /[\u0900-\u097F]/.test(userMessage);
-    const effectiveLanguage = isHindiMessage ? 'hi' : language;
-
-    if (BHASHINI_UDYAT_KEY && BHASHINI_INFERENCE_API_KEY) {
-      try {
-        const response = await bhashiniGenerateResponse(userMessage, effectiveLanguage);
-        return res.json({ reply: response });
-      } catch (bhashiniError) {
-        console.error('Error using Bhashini for response generation:', bhashiniError);
-        console.log('Trying Azure services as fallback...');
-
-        try {
-          const azureResponse = await azureGenerateLegalResponse(userMessage, effectiveLanguage);
-          if (azureResponse.keyPhrases && azureResponse.keyPhrases.length > 0) {
-            for (const phrase of azureResponse.keyPhrases) {
-              for (const [keyword, info] of Object.entries(legalDatabase)) {
-                if (
-                  phrase.toLowerCase().includes(keyword.toLowerCase()) ||
-                  keyword.toLowerCase().includes(phrase.toLowerCase())
-                ) {
-                  let reply = info;
-                  if (effectiveLanguage !== 'en') {
-                    try {
-                      reply = await bhashiniTranslateText(reply, 'en', effectiveLanguage);
-                    } catch (bhashiniTranslationError) {
-                      console.error('Bhashini translation error:', bhashiniTranslationError);
-                      try {
-                        reply = await azureTranslateText(reply, effectiveLanguage, 'en');
-                      } catch (azureTranslationError) {
-                        console.error('Azure translation error:', azureTranslationError);
-                      }
-                    }
-                  }
-                  return res.json({
-                    reply,
-                    analysis: {
-                      sentiment: azureResponse.sentiment,
-                      confidence: azureResponse.confidenceScores,
-                      entityCount: azureResponse.entities.length,
-                    },
-                  });
-                }
-              }
-            }
-          }
-          console.log('No key phrase match found, falling back to local database...');
-        } catch (azureError) {
-          console.error('Error using Azure for response generation:', azureError);
-          console.log('Falling back to local database...');
-        }
-      }
-    }
-
-    let defaultReply =
-      effectiveLanguage === 'hi'
-        ? 'मुझे इस विषय पर अभी जानकारी नहीं है। कृपया एफआईआर दर्ज करने, गिरफ्तारी अधिकारों, कानूनी सहायता, उपभोक्ता शिकायत, या संपत्ति पंजीकरण के बारे में पूछें।'
-        : "I'm sorry, I don't have information on that topic yet. Please try asking about FIR filing, arrest rights, legal aid, consumer complaints, or property registration.";
-
-    let reply = defaultReply;
-    let foundMatch = false;
-
-    if (isHindiMessage) {
-      Object.entries(legalDatabase).forEach(async ([keyword, info]) => {
-        if (/[\u0900-\u097F]/.test(keyword) && userMessage.toLowerCase().includes(keyword.toLowerCase())) {
-          reply = info;
-          foundMatch = true;
-        }
-      });
-
-      if (!foundMatch) {
-        try {
-          const translatedMessage = await bhashiniTranslateText(userMessage, 'hi', 'en');
-          const searchMsg = translatedMessage.toLowerCase();
-
-          Object.entries(legalDatabase).forEach(async ([keyword, info]) => {
-            if (!/[\u0900-\u097F]/.test(keyword) && searchMsg.includes(keyword.toLowerCase())) {
-              const hindiKey = getHindiEquivalent(keyword);
-              if (hindiKey && legalDatabase[hindiKey]) {
-                reply = legalDatabase[hindiKey];
-              } else {
-                try {
-                  reply = await bhashiniTranslateText(info, 'en', 'hi');
-                } catch (translationError) {
-                  console.error('Translation error:', translationError);
-                  reply = info;
-                }
-              }
-              foundMatch = true;
-            }
-          });
-        } catch (translationError) {
-          console.error('Translation error:', translationError);
-        }
-      }
+    const messages = [
+      { role: 'system', content: `You are a helpful legal assistant for Indian law. Always answer in the user's language (${language}).` },
+      { role: 'user', content: userMessage }
+    ];
+    // Always use the correct deployment name for Azure OpenAI
+    const openaiReply = await azureOpenAIChat(messages, 'gpt-4.1');
+    console.log('DEBUG: Azure OpenAI reply:', openaiReply);
+    if (!openaiReply || openaiReply.trim() === "") {
+      res.json({ reply: "Sorry, I could not generate a response. Please try rephrasing your question." });
     } else {
-      let searchMessage = userMessage.toLowerCase();
-      if (language !== 'en' && !isHindiMessage) {
-        try {
-          searchMessage = await bhashiniTranslateText(userMessage, language, 'en');
-          searchMessage = searchMessage.toLowerCase();
-        } catch (translationError) {
-          console.error('Translation error:', translationError);
-        }
-      }
-
-      Object.entries(legalDatabase).forEach(([keyword, info]) => {
-        if (!/[\u0900-\u097F]/.test(keyword) && searchMessage.includes(keyword.toLowerCase())) {
-          reply = info;
-          foundMatch = true;
-        }
-      });
-
-      if (language !== 'en' && reply !== defaultReply) {
-        try {
-          reply = await bhashiniTranslateText(reply, 'en', language);
-        } catch (translationError) {
-          console.error('Translation error for response:', translationError);
-        }
-      }
+      res.json({ reply: openaiReply });
     }
-
-    res.json({ reply });
   } catch (error) {
-    console.error('Error in chat endpoint:', error);
+    console.error('Azure OpenAI error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -408,11 +298,13 @@ app.use('/audio', express.static(audioDir));
 import translateRoute from './routes/translate.js';
 import detectLanguageRoute from './routes/detectLanguage.js';
 import analyzeLegalQueryRoute from './routes/analyzeLegalQuery.js';
+import azureOpenAIRoute from './routes/azureOpenAI.js';
 
 // Use the routes
 app.use(translateRoute);
 app.use(detectLanguageRoute);
 app.use(analyzeLegalQueryRoute);
+app.use(azureOpenAIRoute);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
